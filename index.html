@@ -16,20 +16,56 @@
 	<body>
 		<div class="container h-100 d-flex flex-column">
 			<header class="mb-5 text-center">Header</header>
-			<main class="flex-grow-1">
-				<table class="table table-hover table-bordered">
-					<thead>
-						<tr class="table-dark">
-							<th scope="col">ID</th>
-							<th scope="col">Имя приложения</th>
-							<th scope="col">Псевдоним</th>
-							<th scope="col">Политика</th>
-							<th scope="col">Изменить</th>
-						</tr>
-					</thead>
-					<tbody id="table-body"></tbody>
-				</table>
-			</main>
+			<main class="flex-grow-1"></main>
+			<div
+				class="modal fade"
+				id="Modal"
+				tabindex="-1"
+				aria-labelledby="ModalLabel"
+				aria-hidden="true"
+			>
+				<div class="modal-dialog">
+					<div class="modal-content">
+						<div class="modal-header">
+							<h5 class="modal-title" id="ModalLabel">Новое приложение</h5>
+							<button
+								type="button"
+								class="btn-close"
+								data-bs-dismiss="modal"
+								aria-label="Закрыть"
+							></button>
+						</div>
+						<div class="modal-body">
+							<form>
+								<div class="mb-3">
+									<label for="app-id" class="col-form-label">ID приложения:</label>
+									<input type="text" class="form-control" id="app-id" readonly disabled />
+								</div>
+								<div class="mb-3">
+									<label for="app-name" class="col-form-label">Имя приложения:</label>
+									<input type="text" class="form-control" id="app-name" />
+								</div>
+								<div class="mb-3">
+									<label for="app-alias" class="col-form-label">Псевдоним:</label>
+									<input class="form-control" id="app-alias" />
+								</div>
+								<div class="mb-3">
+									<label for="app-policy" class="col-form-label">Политика:</label>
+									<input class="form-control" id="app-policy" />
+								</div>
+							</form>
+						</div>
+						<div class="modal-footer">
+							<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+								Закрыть
+							</button>
+							<button type="button" class="btn btn-primary" id="save-changes">
+								Сохранить изменения
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
 			<footer class="text-center">Footer</footer>
 		</div>
 		<script
