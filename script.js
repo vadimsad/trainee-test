@@ -29,9 +29,8 @@ const API = {
 		const json = await response.json();
 		return json;
 	},
-	async createNewApp(appData) {
+	async createApp(appData) {
 		const appDataString = JSON.stringify(appData);
-		const appDataNormalized = appDataString.slice(1, appDataString.length - 1);
 
 		const response = await fetch(`${this.url}/Face/New_app`, {
 			method: 'POST',
@@ -39,24 +38,24 @@ const API = {
 				'Content-Type': 'application/json; charset=utf-8',
 				'Content-Length': 124,
 			},
-			body: appDataNormalized,
+			body: `'${appDataString}'`,
 		});
-		console.log(appDataNormalized);
-		return response;
+		const json = await response.json();
+		return json;
 	},
 };
 
 document.addEventListener('DOMContentLoaded', main);
 
 function main() {
-	const tableWrapper = document.querySelector('.table-responsive');
+	const tableWrapper = document.querySelector('.table-wrapper');
 	const modal = document.getElementById('Modal');
 	const saveChangesButton = document.getElementById('save-changes');
+	const createAppButton = document.querySelector('#create-app');
 
-	handleModalShow(modal);
-	handleModalHide(modal);
+	createAppButton.addEventListener('click', () => {});
+	setModalEventListeners(modal);
 	renderTable(tableWrapper);
-	saveChangesButton.addEventListener('click', () => handleUpdateApp(modal));
 }
 
 async function renderTable(parentElement) {
@@ -110,63 +109,104 @@ function createCell(row, cellData) {
 }
 
 function createEditButton(element, relatedData) {
-	element.innerHTML = `<button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#Modal" data-app-id='${
-		relatedData[0] || ''
-	}' data-app-name='${relatedData[1] || ''}' data-app-alias='${
-		relatedData[2] || ''
-	}' data-app-policy='${relatedData[3] || ''}' >Изменить</button>`;
+	element.innerHTML = `<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#Modal" data-app-name='${
+		relatedData[1] || ''
+	}' data-app-id='${relatedData[2] || ''}' data-app-policy='${
+		relatedData[3] || ''
+	}' >Изменить</button>`;
 }
 
-function handleModalShow(modalElement) {
-	modalElement.addEventListener('show.bs.modal', function (event) {
+function setModalEventListeners(modalElement) {
+	modalElement.addEventListener('show.bs.modal', handleModalShow);
+	modalElement.addEventListener('hide.bs.modal', handleModalHide);
+
+	function handleModalShow(event) {
 		const button = event.relatedTarget;
+		const isCreateButton = !!button.getAttribute('data-create-app');
+		const saveButton = modalElement.querySelector('#save-changes');
 
 		const appId = button.getAttribute('data-app-id');
 		const appName = button.getAttribute('data-app-name');
-		const appAlias = button.getAttribute('data-app-alias');
 		const appPolicy = button.getAttribute('data-app-policy');
 
 		const appIdInput = modalElement.querySelector('#app-id');
 		const appNameInput = modalElement.querySelector('#app-name');
-		const appAliasInput = modalElement.querySelector('#app-alias');
 		const appPolicyInput = modalElement.querySelector('#app-policy');
 
 		appIdInput.value = appId;
 		appNameInput.value = appName;
-		appAliasInput.value = appAlias;
 		appPolicyInput.value = appPolicy;
-	});
-}
 
-function handleModalHide(modalElement) {
-	modalElement.addEventListener('hidden.bs.modal', function (event) {
+		if (isCreateButton) {
+			saveButton.addEventListener('click', handleCreateApp);
+		} else {
+			saveButton.addEventListener('click', handleUpdateApp);
+
+			appIdInput.setAttribute('readonly', '');
+			appIdInput.setAttribute('disabled', '');
+		}
+	}
+
+	function handleModalHide(event) {
+		const saveButton = modalElement.querySelector('#save-changes');
+		const appIdInput = modalElement.querySelector('#app-id');
+		appIdInput.removeAttribute('readonly');
+		appIdInput.removeAttribute('disabled');
+
+		saveButton.removeEventListener('click', handleUpdateApp);
+		saveButton.removeEventListener('click', handleCreateApp);
+
 		closeAlert();
-	});
-}
+	}
 
-async function handleUpdateApp(modalElement) {
-	// const appIdValue = modalElement.querySelector('#app-id').value;
-	const appNameValue = modalElement.querySelector('#app-name').value;
-	const appAliasValue = modalElement.querySelector('#app-alias').value;
-	const appPolicyValue = modalElement.querySelector('#app-policy').value;
+	async function handleUpdateApp() {
+		const appIdValue = modalElement.querySelector('#app-id').value;
+		const appNameValue = modalElement.querySelector('#app-name').value;
+		const appPolicyValue = modalElement.querySelector('#app-policy').value;
 
-	const appData = {
-		app_id: appAliasValue,
-		app_name: appNameValue,
-		policy_id: appPolicyValue,
-		agent_js_config: '123123',
-		correlations_config: '321321',
-	};
+		const appData = {
+			app_id: appIdValue,
+			app_name: appNameValue,
+			policy_id: appPolicyValue,
+			agent_js_config: '123123',
+			correlations_config: '321321',
+		};
 
-	const res = await API.updateApp(appData);
+		const res = await API.updateApp(appData);
 
-	if (!errorWhileFetching(res)) {
-		const modalForJS = bootstrap.Modal.getInstance(modalElement);
-		modalForJS.hide();
-		removeTable(document.querySelector('table'));
-		renderTable(document.querySelector('.table-responsive'));
-	} else {
-		showAlert();
+		if (!errorWhileFetching(res)) {
+			const modalForJS = bootstrap.Modal.getInstance(modalElement);
+			modalForJS.hide();
+			removeTable(document.querySelector('table'));
+			renderTable(document.querySelector('.table-wrapper'));
+		} else {
+			showAlert();
+		}
+	}
+
+	async function handleCreateApp() {
+		const appIdValue = modalElement.querySelector('#app-id').value;
+		const appNameValue = modalElement.querySelector('#app-name').value;
+		const appPolicyValue = modalElement.querySelector('#app-policy').value;
+
+		const appData = {
+			app_id: appIdValue,
+			app_name: appNameValue,
+			policy_id: appPolicyValue,
+			agent_js_config: '123123',
+			correlations_config: '321321',
+		};
+
+		const res = await API.createApp(appData);
+
+		if (!errorWhileFetching(res)) {
+			const modalForJS = bootstrap.Modal.getInstance(modalElement);
+			modalForJS.hide();
+			removeTable(document.querySelector('table'));
+			renderTable(document.querySelector('.table-wrapper'));
+		} else {
+			showAlert();
+		}
 	}
 }
 
