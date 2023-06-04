@@ -7,4 +7,7 @@ th,
 td {
   vertical-align: middle;
 }
-/*# sourceMappingURL=style.css.map */
+
+.alert {
+  display: none;
+}/*# sourceMappingURL=style.css.map */

@@ -14,9 +14,11 @@
 		<title>Trainee test</title>
 	</head>
 	<body>
-		<div class="container h-100 d-flex flex-column">
+		<div class="container-xl h-100 d-flex flex-column">
 			<header class="mb-5 text-center">Header</header>
-			<main class="flex-grow-1"></main>
+			<main class="flex-grow-1">
+				<div class="table-responsive"></div>
+			</main>
 			<div
 				class="modal fade"
 				id="Modal"
@@ -51,9 +53,10 @@
 								</div>
 								<div class="mb-3">
 									<label for="app-policy" class="col-form-label">Политика:</label>
-									<input class="form-control" id="app-policy" />
+									<input class="form-control" id="app-policy" type="number" />
 								</div>
 							</form>
+							<div class="alert alert-danger" role="alert">Ошибка сохранения</div>
 						</div>
 						<div class="modal-footer">
 							<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">

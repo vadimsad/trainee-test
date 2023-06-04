@@ -24,9 +24,24 @@ const API = {
 				'Content-Type': 'application/json; charset=utf-8',
 				'Content-Length': 124,
 			},
-			body: appDataString,
+			body: `'${appDataString}'`,
 		});
-		console.log(appDataString);
+		const json = await response.json();
+		return json;
+	},
+	async createNewApp(appData) {
+		const appDataString = JSON.stringify(appData);
+		const appDataNormalized = appDataString.slice(1, appDataString.length - 1);
+
+		const response = await fetch(`${this.url}/Face/New_app`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json; charset=utf-8',
+				'Content-Length': 124,
+			},
+			body: appDataNormalized,
+		});
+		console.log(appDataNormalized);
 		return response;
 	},
 };
@@ -34,18 +49,17 @@ const API = {
 document.addEventListener('DOMContentLoaded', main);
 
 function main() {
-	const mainElement = document.querySelector('main');
+	const tableWrapper = document.querySelector('.table-responsive');
 	const modal = document.getElementById('Modal');
 	const saveChangesButton = document.getElementById('save-changes');
 
 	handleModalShow(modal);
-	renderTable(mainElement);
+	handleModalHide(modal);
+	renderTable(tableWrapper);
 	saveChangesButton.addEventListener('click', () => handleUpdateApp(modal));
 }
 
 async function renderTable(parentElement) {
-	const appData = await API.getAppList();
-
 	const table = document.createElement('table');
 	table.classList = 'table table-hover table-bordered';
 	table.innerHTML = `
@@ -60,11 +74,13 @@ async function renderTable(parentElement) {
 		</thead>
 		<tbody id="table-body"></tbody>`;
 
+	const appData = await API.getAppList();
+
 	fillTable(table.querySelector('#table-body'), appData);
 	parentElement.appendChild(table);
 }
 
-function fillTable(table, data) {
+function fillTable(tableBody, data) {
 	data.app_table_ids.forEach((_, index) => {
 		const cellData = [
 			data.app_table_ids[index],
@@ -72,12 +88,16 @@ function fillTable(table, data) {
 			data.ids[index],
 			data.policy_ids[index],
 		];
-		createRow(table, cellData);
+		createRow(tableBody, cellData);
 	});
 }
 
-function createRow(table, cellDataArr) {
-	const row = table.insertRow();
+function removeTable(table) {
+	table.remove();
+}
+
+function createRow(tableBody, cellDataArr) {
+	const row = tableBody.insertRow();
 	cellDataArr.forEach((cellData) => createCell(row, cellData));
 
 	const lastCell = row.insertCell();
@@ -118,14 +138,20 @@ function handleModalShow(modalElement) {
 	});
 }
 
+function handleModalHide(modalElement) {
+	modalElement.addEventListener('hidden.bs.modal', function (event) {
+		closeAlert();
+	});
+}
+
 async function handleUpdateApp(modalElement) {
-	const appIdValue = modalElement.querySelector('#app-id').value;
+	// const appIdValue = modalElement.querySelector('#app-id').value;
 	const appNameValue = modalElement.querySelector('#app-name').value;
 	const appAliasValue = modalElement.querySelector('#app-alias').value;
 	const appPolicyValue = modalElement.querySelector('#app-policy').value;
 
 	const appData = {
-		app_id: appIdValue,
+		app_id: appAliasValue,
 		app_name: appNameValue,
 		policy_id: appPolicyValue,
 		agent_js_config: '123123',
@@ -133,5 +159,42 @@ async function handleUpdateApp(modalElement) {
 	};
 
 	const res = await API.updateApp(appData);
-	console.log(res);
+
+	if (!errorWhileFetching(res)) {
+		const modalForJS = bootstrap.Modal.getInstance(modalElement);
+		modalForJS.hide();
+		removeTable(document.querySelector('table'));
+		renderTable(document.querySelector('.table-responsive'));
+	} else {
+		showAlert();
+	}
+}
+
+function errorWhileFetching(fetchResponse) {
+	if (!fetchResponse.error) {
+		console.warn(`Don't know how to handle this type of response :(`);
+		return;
+	}
+
+	switch (fetchResponse.error) {
+		case '0': {
+			return false;
+		}
+		case '1': {
+			return true;
+		}
+		default: {
+			return true;
+		}
+	}
+}
+
+function showAlert() {
+	const alertElement = document.querySelector('.alert');
+	alertElement.classList.add('d-block');
+}
+
+function closeAlert() {
+	const alertElement = document.querySelector('.alert');
+	alertElement.classList.remove('d-block');
 }
