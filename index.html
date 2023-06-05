@@ -10,10 +10,24 @@
 			integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM"
 			crossorigin="anonymous"
 		/>
-		<link rel="stylesheet" href="./style.css" />
 		<title>Trainee test</title>
 	</head>
 	<body>
+		<style>
+			html,
+			body {
+				height: 100%;
+			}
+
+			th,
+			td {
+				vertical-align: middle;
+			}
+
+			.alert {
+				display: none;
+			}
+		</style>
 		<div class="container-xl h-100 d-flex flex-column">
 			<header class="mb-5 text-center"><h1>Тестовое задание</h1></header>
 			<main class="flex-grow-1">
@@ -28,6 +42,7 @@
 					Добавить приложение
 				</button>
 				<div class="table-wrapper table-responsive"></div>
+				<canvas id="myChart" class="mb-5"></canvas>
 				<div
 					class="modal fade"
 					id="Modal"
@@ -82,6 +97,363 @@
 			integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
 			crossorigin="anonymous"
 		></script>
-		<script src="./script.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<script>
+			'use strict';
+
+			const API = {
+				url: 'http://checkstatus.website:8099',
+				interceptedRequests: {}, // interceptedRequests = {'14:36': {'get': 2, 'update': 1, 'create': 0}}
+
+				async getAppList() {
+					const response = await fetch(`${this.url}/Face/App_List`, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json; charset=utf-8',
+							'Content-Length': 2,
+						},
+						body: JSON.stringify(''),
+					});
+					const json = await response.json();
+
+					this.updateInterceptedRequests('get');
+					document.dispatchEvent(interceptedRequestsChanged);
+					return json;
+				},
+				async updateApp(appData) {
+					const appDataString = JSON.stringify(appData);
+					const response = await this.sendAppData(
+						`${this.url}/Face/Update_app`,
+						`'${appDataString}'`,
+					);
+					const json = await response.json();
+
+					this.updateInterceptedRequests('update');
+					document.dispatchEvent(interceptedRequestsChanged);
+					return json;
+				},
+				async createApp(appData) {
+					const appDataString = JSON.stringify(appData);
+					const response = await this.sendAppData(`${this.url}/Face/New_app`, `'${appDataString}'`);
+					const json = await response.json();
+
+					this.updateInterceptedRequests('create');
+					document.dispatchEvent(interceptedRequestsChanged);
+					return json;
+				},
+				sendAppData(path, body) {
+					return fetch(path, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json; charset=utf-8',
+							'Content-Length': 124,
+						},
+						body,
+					});
+				},
+				updateInterceptedRequests(requestType) {
+					const currentTime = new Date().toLocaleTimeString(navigator.language, {
+						hour: '2-digit',
+						minute: '2-digit',
+					});
+					const interceptedRequest = this.interceptedRequests[currentTime];
+					if (interceptedRequest) {
+						interceptedRequest[requestType] = (interceptedRequest[requestType] || 0) + 1;
+					} else {
+						this.interceptedRequests[currentTime] = {
+							get: 0,
+							update: 0,
+							create: 0,
+							[requestType]: 1,
+						};
+					}
+				},
+			};
+
+			const interceptedRequestsChanged = new Event('interceptedRequestsChanged');
+
+			document.addEventListener('DOMContentLoaded', init);
+
+			function init() {
+				const tableWrapper = document.querySelector('.table-wrapper');
+				const modal = document.getElementById('Modal');
+
+				setModalEventListeners(modal);
+				renderTable(tableWrapper);
+				createChart();
+			}
+
+			async function renderTable(parentElement) {
+				const table = createTable();
+				const appData = await API.getAppList();
+
+				fillTable(table, appData);
+				parentElement.append(table);
+			}
+
+			function createTable() {
+				const table = document.createElement('table');
+				table.classList = 'table table-hover table-bordered';
+				table.innerHTML = `
+					<thead>
+						<tr class="table-dark">
+							<th scope="col">ID</th>
+							<th scope="col">Имя приложения</th>
+							<th scope="col">Псевдоним</th>
+							<th scope="col">Политика</th>
+							<th scope="col">Изменить</th>
+						</tr>
+					</thead>
+					<tbody id="table-body"></tbody>`;
+
+				return table;
+			}
+
+			function fillTable(table, data) {
+				const tableBody = table.querySelector('#table-body');
+
+				data.app_table_ids.forEach((_, index) => {
+					const rowData = [
+						data.app_table_ids[index],
+						data.names[index],
+						data.ids[index],
+						data.policy_ids[index],
+					];
+					createRow(tableBody, rowData);
+				});
+			}
+
+			function createRow(tableBody, rowData) {
+				const row = tableBody.insertRow();
+				rowData.forEach((cellData) => createCell(row, cellData));
+
+				createEditButtonCell(row, rowData);
+			}
+
+			function createCell(row, data) {
+				const cell = row.insertCell();
+				cell.innerText = data;
+			}
+
+			function createEditButton(relatedData) {
+				const button = document.createElement('button');
+				button.textContent = 'Изменить';
+				button.className = 'btn btn-primary';
+				button.type = 'button';
+				button.setAttribute('data-bs-toggle', 'modal');
+				button.setAttribute('data-bs-target', '#Modal');
+				button.setAttribute('data-app-name', `${relatedData[1] || ''}`);
+				button.setAttribute('data-app-id', `${relatedData[2] || ''}`);
+				button.setAttribute('data-app-policy', `${relatedData[3] || ''}`);
+
+				return button;
+			}
+
+			function createEditButtonCell(row, rowData) {
+				const cell = row.insertCell();
+				const editButton = createEditButton(rowData);
+				cell.appendChild(editButton);
+			}
+
+			function setModalEventListeners(modalElement) {
+				modalElement.addEventListener('show.bs.modal', handleModalShow);
+				modalElement.addEventListener('hide.bs.modal', handleModalHide);
+
+				function handleModalShow(event) {
+					const button = event.relatedTarget;
+					const isCreateButton = !!button.getAttribute('data-create-app');
+					const saveButton = modalElement.querySelector('#save-changes');
+					const appIdInput = modalElement.querySelector('#app-id');
+					const appNameInput = modalElement.querySelector('#app-name');
+					const appPolicyInput = modalElement.querySelector('#app-policy');
+
+					populateModalInputs(button, appIdInput, appNameInput, appPolicyInput);
+
+					if (isCreateButton) {
+						saveButton.addEventListener('click', handleCreateApp);
+					} else {
+						saveButton.addEventListener('click', handleUpdateApp);
+						disableAppIdInput(appIdInput);
+					}
+				}
+
+				function handleModalHide() {
+					const saveButton = modalElement.querySelector('#save-changes');
+					const appIdInput = modalElement.querySelector('#app-id');
+					saveButton.removeEventListener('click', handleUpdateApp);
+					saveButton.removeEventListener('click', handleCreateApp);
+					enableAppIdInput(appIdInput);
+					closeAlert();
+				}
+
+				function populateModalInputs(button, appIdInput, appNameInput, appPolicyInput) {
+					appIdInput.value = button.getAttribute('data-app-id') || '';
+					appNameInput.value = button.getAttribute('data-app-name') || '';
+					appPolicyInput.value = button.getAttribute('data-app-policy') || '';
+				}
+
+				function disableAppIdInput(appIdInput) {
+					appIdInput.setAttribute('readonly', '');
+					appIdInput.setAttribute('disabled', '');
+				}
+
+				function enableAppIdInput(appIdInput) {
+					appIdInput.removeAttribute('readonly');
+					appIdInput.removeAttribute('disabled');
+				}
+
+				async function handleUpdateApp() {
+					try {
+						const appData = getFormData(modalElement);
+						const res = await API.updateApp(appData);
+
+						if (!errorWhileFetching(res)) {
+							const modalForJS = bootstrap.Modal.getInstance(modalElement);
+							modalForJS.hide();
+							updateTable();
+						} else {
+							showAlert();
+						}
+					} catch (error) {
+						console.warn(`Unknown error while updating the app: ${error}`);
+					}
+				}
+
+				async function handleCreateApp() {
+					try {
+						const appData = getFormData(modalElement);
+						const res = await API.createApp(appData);
+
+						if (!errorWhileFetching(res)) {
+							const modalForJS = bootstrap.Modal.getInstance(modalElement);
+							modalForJS.hide();
+							updateTable();
+						} else {
+							showAlert();
+						}
+					} catch (error) {
+						console.warn(`Unknown error while creating the app: ${error}`);
+					}
+				}
+			}
+
+			function getFormData(modalElement) {
+				const appIdValue = modalElement.querySelector('#app-id').value;
+				const appNameValue = modalElement.querySelector('#app-name').value;
+				const appPolicyValue = modalElement.querySelector('#app-policy').value;
+
+				return {
+					app_id: appIdValue,
+					app_name: appNameValue,
+					policy_id: appPolicyValue,
+					agent_js_config: '123123',
+					correlations_config: '321321',
+				};
+			}
+
+			function updateTable() {
+				const tableWrapper = document.querySelector('.table-wrapper');
+				const table = document.querySelector('table');
+				table.remove();
+				renderTable(tableWrapper);
+			}
+
+			function errorWhileFetching(fetchResponse) {
+				if (!fetchResponse.error) {
+					console.warn(`Don't know how to handle this type of response :(`);
+					console.log(fetchResponse);
+					return;
+				}
+
+				switch (fetchResponse.error) {
+					case '0':
+						return false;
+					case '1':
+					default:
+						return true;
+				}
+			}
+
+			function showAlert() {
+				const alertElement = document.querySelector('.alert');
+				alertElement.classList.add('d-block');
+			}
+
+			function closeAlert() {
+				const alertElement = document.querySelector('.alert');
+				alertElement.classList.remove('d-block');
+			}
+
+			function createChart() {
+				const chartType = 'bar';
+				const chartOptions = {
+					plugins: {
+						title: {
+							display: true,
+							text: 'Перехваченные запросы',
+						},
+					},
+					responsive: true,
+					scales: {
+						x: {
+							stacked: true,
+						},
+						y: {
+							stacked: true,
+							beginAtZero: true,
+						},
+					},
+				};
+				const ctx = document.getElementById('myChart');
+				const chartData = Object.values(API.interceptedRequests);
+
+				const chart = new Chart(ctx, {
+					type: chartType,
+					data: {
+						labels: Object.keys(API.interceptedRequests),
+						datasets: [
+							{
+								label: 'Получение',
+								data: chartData.map((item) => item.get),
+								borderWidth: 1,
+								backgroundColor: 'red',
+							},
+							{
+								label: 'Обновление',
+								data: chartData.map((item) => item.update),
+								borderWidth: 1,
+								backgroundColor: 'green',
+							},
+							{
+								label: 'Создание',
+								data: chartData.map((item) => item.create),
+								borderWidth: 1,
+								backgroundColor: 'blue',
+							},
+						],
+					},
+					options: chartOptions,
+				});
+
+				document.addEventListener('interceptedRequestsChanged', function () {
+					const chartData = Object.values(API.interceptedRequests);
+					updateChartLabels(chart, Object.keys(API.interceptedRequests));
+					updateChartData(chart, chartData);
+					chart.update();
+				});
+
+				return chart;
+			}
+
+			function updateChartLabels(chart, labels) {
+				chart.data.labels = labels;
+			}
+
+			function updateChartData(chart, chartData) {
+				chart.data.datasets[0].data = chartData.map((item) => item.get);
+				chart.data.datasets[1].data = chartData.map((item) => item.update);
+				chart.data.datasets[2].data = chartData.map((item) => item.create);
+			}
+		</script>
 	</body>
 </html>
