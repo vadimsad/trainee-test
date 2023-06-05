@@ -50,15 +50,20 @@ document.addEventListener('DOMContentLoaded', main);
 function main() {
 	const tableWrapper = document.querySelector('.table-wrapper');
 	const modal = document.getElementById('Modal');
-	const saveChangesButton = document.getElementById('save-changes');
-	const createAppButton = document.querySelector('#create-app');
 
-	createAppButton.addEventListener('click', () => {});
 	setModalEventListeners(modal);
 	renderTable(tableWrapper);
 }
 
 async function renderTable(parentElement) {
+	const table = createTable();
+	const appData = await API.getAppList();
+
+	fillTable(table, appData);
+	parentElement.append(table);
+}
+
+function createTable() {
 	const table = document.createElement('table');
 	table.classList = 'table table-hover table-bordered';
 	table.innerHTML = `
@@ -73,47 +78,53 @@ async function renderTable(parentElement) {
 		</thead>
 		<tbody id="table-body"></tbody>`;
 
-	const appData = await API.getAppList();
-
-	fillTable(table.querySelector('#table-body'), appData);
-	parentElement.appendChild(table);
+	return table;
 }
 
-function fillTable(tableBody, data) {
+function fillTable(table, data) {
+	const tableBody = table.querySelector('#table-body');
+
 	data.app_table_ids.forEach((_, index) => {
-		const cellData = [
+		const rowData = [
 			data.app_table_ids[index],
 			data.names[index],
 			data.ids[index],
 			data.policy_ids[index],
 		];
-		createRow(tableBody, cellData);
+		createRow(tableBody, rowData);
 	});
 }
 
-function removeTable(table) {
-	table.remove();
-}
-
-function createRow(tableBody, cellDataArr) {
+function createRow(tableBody, rowData) {
 	const row = tableBody.insertRow();
-	cellDataArr.forEach((cellData) => createCell(row, cellData));
+	rowData.forEach((cellData) => createCell(row, cellData));
 
-	const lastCell = row.insertCell();
-	createEditButton(lastCell, cellDataArr);
+	createEditButtonCell(row, rowData);
 }
 
-function createCell(row, cellData) {
+function createCell(row, data) {
 	const cell = row.insertCell();
-	cell.innerText = cellData;
+	cell.innerText = data;
 }
 
-function createEditButton(element, relatedData) {
-	element.innerHTML = `<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#Modal" data-app-name='${
-		relatedData[1] || ''
-	}' data-app-id='${relatedData[2] || ''}' data-app-policy='${
-		relatedData[3] || ''
-	}' >Изменить</button>`;
+function createEditButtonCell(row, rowData) {
+	const cell = row.insertCell();
+	const editButton = createEditButton(rowData);
+	cell.appendChild(editButton);
+}
+
+function createEditButton(relatedData) {
+	const button = document.createElement('button');
+	button.textContent = 'Изменить';
+	button.className = 'btn btn-primary';
+	button.type = 'button';
+	button.setAttribute('data-bs-toggle', 'modal');
+	button.setAttribute('data-bs-target', '#Modal');
+	button.setAttribute('data-app-name', `${relatedData[1] || ''}`);
+	button.setAttribute('data-app-id', `${relatedData[2] || ''}`);
+	button.setAttribute('data-app-policy', `${relatedData[3] || ''}`);
+
+	return button;
 }
 
 function setModalEventListeners(modalElement) {
@@ -124,90 +135,87 @@ function setModalEventListeners(modalElement) {
 		const button = event.relatedTarget;
 		const isCreateButton = !!button.getAttribute('data-create-app');
 		const saveButton = modalElement.querySelector('#save-changes');
-
-		const appId = button.getAttribute('data-app-id');
-		const appName = button.getAttribute('data-app-name');
-		const appPolicy = button.getAttribute('data-app-policy');
-
 		const appIdInput = modalElement.querySelector('#app-id');
 		const appNameInput = modalElement.querySelector('#app-name');
 		const appPolicyInput = modalElement.querySelector('#app-policy');
 
-		appIdInput.value = appId;
-		appNameInput.value = appName;
-		appPolicyInput.value = appPolicy;
+		appIdInput.value = button.getAttribute('data-app-id') || '';
+		appNameInput.value = button.getAttribute('data-app-name') || '';
+		appPolicyInput.value = button.getAttribute('data-app-policy') || '';
 
 		if (isCreateButton) {
 			saveButton.addEventListener('click', handleCreateApp);
 		} else {
 			saveButton.addEventListener('click', handleUpdateApp);
-
 			appIdInput.setAttribute('readonly', '');
 			appIdInput.setAttribute('disabled', '');
 		}
 	}
 
-	function handleModalHide(event) {
+	function handleModalHide() {
 		const saveButton = modalElement.querySelector('#save-changes');
 		const appIdInput = modalElement.querySelector('#app-id');
 		appIdInput.removeAttribute('readonly');
 		appIdInput.removeAttribute('disabled');
-
 		saveButton.removeEventListener('click', handleUpdateApp);
 		saveButton.removeEventListener('click', handleCreateApp);
-
 		closeAlert();
 	}
 
 	async function handleUpdateApp() {
-		const appIdValue = modalElement.querySelector('#app-id').value;
-		const appNameValue = modalElement.querySelector('#app-name').value;
-		const appPolicyValue = modalElement.querySelector('#app-policy').value;
+		try {
+			const appData = getFormData(modalElement);
+			const res = await API.updateApp(appData);
 
-		const appData = {
-			app_id: appIdValue,
-			app_name: appNameValue,
-			policy_id: appPolicyValue,
-			agent_js_config: '123123',
-			correlations_config: '321321',
-		};
-
-		const res = await API.updateApp(appData);
-
-		if (!errorWhileFetching(res)) {
-			const modalForJS = bootstrap.Modal.getInstance(modalElement);
-			modalForJS.hide();
-			removeTable(document.querySelector('table'));
-			renderTable(document.querySelector('.table-wrapper'));
-		} else {
-			showAlert();
+			if (!errorWhileFetching(res)) {
+				const modalForJS = bootstrap.Modal.getInstance(modalElement);
+				modalForJS.hide();
+				updateTable();
+			} else {
+				showAlert();
+			}
+		} catch (error) {
+			console.warn(`Error while updating the app: ${error}`);
 		}
 	}
 
 	async function handleCreateApp() {
+		try {
+			const appData = getFormData(modalElement);
+			const res = await API.createApp(appData);
+
+			if (!errorWhileFetching(res)) {
+				const modalForJS = bootstrap.Modal.getInstance(modalElement);
+				modalForJS.hide();
+				updateTable();
+			} else {
+				showAlert();
+			}
+		} catch (error) {
+			console.warn(`Error while creating the app: ${error}`);
+		}
+	}
+
+	function getFormData(modalElement) {
 		const appIdValue = modalElement.querySelector('#app-id').value;
 		const appNameValue = modalElement.querySelector('#app-name').value;
 		const appPolicyValue = modalElement.querySelector('#app-policy').value;
 
-		const appData = {
+		return {
 			app_id: appIdValue,
 			app_name: appNameValue,
 			policy_id: appPolicyValue,
 			agent_js_config: '123123',
 			correlations_config: '321321',
 		};
-
-		const res = await API.createApp(appData);
-
-		if (!errorWhileFetching(res)) {
-			const modalForJS = bootstrap.Modal.getInstance(modalElement);
-			modalForJS.hide();
-			removeTable(document.querySelector('table'));
-			renderTable(document.querySelector('.table-wrapper'));
-		} else {
-			showAlert();
-		}
 	}
+}
+
+function updateTable() {
+	const tableWrapper = document.querySelector('.table-wrapper');
+	const table = document.querySelector('table');
+	table.remove();
+	renderTable(tableWrapper);
 }
 
 function errorWhileFetching(fetchResponse) {
@@ -217,15 +225,11 @@ function errorWhileFetching(fetchResponse) {
 	}
 
 	switch (fetchResponse.error) {
-		case '0': {
+		case '0':
 			return false;
-		}
-		case '1': {
+		case '1':
+		default:
 			return true;
-		}
-		default: {
-			return true;
-		}
 	}
 }
 
